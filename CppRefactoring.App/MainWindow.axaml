@@ -1,0 +1,161 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="CppRefactoring.App.MainWindow"
+        Title="C++ Refactoring Editor"
+        Width="1200" Height="720"
+        MinWidth="900" MinHeight="500">
+
+  <Grid RowDefinitions="Auto,*,28">
+
+    <!-- ── Панель інструментів ───────────────────────────────────────── -->
+    <Border Grid.Row="0" Background="#1E1E1E" Padding="6,4">
+      <StackPanel Orientation="Horizontal" Spacing="6">
+        <Button x:Name="BtnLoad"  Content="📂 Відкрити файл" Click="OnLoadFile"
+                Padding="10,4" ToolTip.Tip="Відкрити .cpp / .h файл"/>
+        <Button x:Name="BtnSave"  Content="💾 Зберегти файл" Click="OnSaveFile"
+                Padding="10,4" ToolTip.Tip="Зберегти поточний код"/>
+        <Button x:Name="BtnUndo"  Content="↩ Скасувати"      Click="OnUndo"
+                Padding="10,4" ToolTip.Tip="Скасувати останній рефакторинг"/>
+      </StackPanel>
+    </Border>
+
+    <!-- ── Основна робоча область ────────────────────────────────────── -->
+    <Grid Grid.Row="1" ColumnDefinitions="*,Auto,*">
+
+      <!-- Ліва панель — вхідний код -->
+      <Border Grid.Column="0" Margin="6" BorderThickness="1" BorderBrush="#444"
+              CornerRadius="4">
+        <Grid RowDefinitions="Auto,*">
+          <Border Grid.Row="0" Background="#252526" Padding="8,4"
+                  CornerRadius="4,4,0,0">
+            <TextBlock Text="Вихідний код C++" FontWeight="SemiBold"
+                       Foreground="#CCCCCC"/>
+          </Border>
+          <TextBox Grid.Row="1"
+                   x:Name="InputCode"
+                   AcceptsReturn="True"
+                   TextWrapping="NoWrap"
+                   FontFamily="Cascadia Code,Menlo,Courier New,Monospace"
+                   FontSize="13"
+                   Background="#1E1E1E"
+                   Foreground="#D4D4D4"
+                   BorderThickness="0"
+                   Padding="8"
+                   ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                   ScrollViewer.VerticalScrollBarVisibility="Auto"
+                   Text="void foo(int x) {&#10;    return x;&#10;}&#10;&#10;void bar() {&#10;    int result = foo(1);&#10;}"/>
+        </Grid>
+      </Border>
+
+      <!-- Центральна панель — параметри рефакторингу -->
+      <Border Grid.Column="1" Width="260" Margin="0,6"
+              BorderThickness="1" BorderBrush="#444" CornerRadius="4">
+        <Grid RowDefinitions="Auto,*,Auto">
+
+          <!-- Заголовок -->
+          <Border Grid.Row="0" Background="#252526" Padding="8,4"
+                  CornerRadius="4,4,0,0">
+            <TextBlock Text="Параметри рефакторингу" FontWeight="SemiBold"
+                       Foreground="#CCCCCC" TextWrapping="Wrap"/>
+          </Border>
+
+          <!-- Форма -->
+          <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="10,8" Spacing="6">
+
+              <TextBlock Text="Метод рефакторингу:" Foreground="#CCCCCC"
+                         FontWeight="SemiBold"/>
+              <ComboBox x:Name="RefactoringSelector"
+                        HorizontalAlignment="Stretch"
+                        SelectionChanged="OnRefactoringChanged">
+                <ComboBoxItem Tag="Rename"   Content="Варіант 1 — Перейменування змінної"/>
+                <ComboBoxItem Tag="Format"   Content="Варіант 3 — Форматування блоку"/>
+                <ComboBoxItem Tag="AddParam" Content="Варіант 9 — Додавання параметра"/>
+              </ComboBox>
+
+              <!-- VariableRenamer params -->
+              <StackPanel x:Name="RenamePanel" Spacing="4">
+                <TextBlock Text="Стара назва (OldName):" Foreground="#9CDCFE"/>
+                <TextBox x:Name="OldNameBox" Watermark="напр. x" Padding="6,4"/>
+                <TextBlock Text="Нова назва (NewName):"  Foreground="#9CDCFE"/>
+                <TextBox x:Name="NewNameBox" Watermark="напр. count" Padding="6,4"/>
+              </StackPanel>
+
+              <!-- BlockFormatter params -->
+              <StackPanel x:Name="FormatPanel" IsVisible="False" Spacing="4">
+                <TextBlock Text="Стиль дужок:" Foreground="#9CDCFE"/>
+                <ComboBox x:Name="BraceStyleBox" HorizontalAlignment="Stretch">
+                  <ComboBoxItem Tag="Allman" Content="Allman (дужка на новому рядку)"/>
+                  <ComboBoxItem Tag="KAndR"  Content="K&amp;R (дужка в кінці рядка)"/>
+                </ComboBox>
+                <TextBlock Text="Розмір відступу (пробілів):" Foreground="#9CDCFE"/>
+                <NumericUpDown x:Name="IndentSizeBox"
+                               Value="4" Minimum="1" Maximum="16"
+                               Increment="1" FormatString="0"/>
+              </StackPanel>
+
+              <!-- ParameterAdder params -->
+              <StackPanel x:Name="AddParamPanel" IsVisible="False" Spacing="4">
+                <TextBlock Text="Назва функції:" Foreground="#9CDCFE"/>
+                <TextBox x:Name="FuncNameBox"  Watermark="напр. foo"   Padding="6,4"/>
+                <TextBlock Text="Тип параметра:" Foreground="#9CDCFE"/>
+                <TextBox x:Name="ParamTypeBox" Watermark="напр. int"   Padding="6,4"/>
+                <TextBlock Text="Назва параметра:" Foreground="#9CDCFE"/>
+                <TextBox x:Name="ParamNameBox" Watermark="напр. value" Padding="6,4"/>
+                <TextBlock Text="Значення за замовч. (необов.):"
+                           Foreground="#9CDCFE" TextWrapping="Wrap"/>
+                <TextBox x:Name="DefaultValBox" Watermark="напр. 0"   Padding="6,4"/>
+              </StackPanel>
+
+            </StackPanel>
+          </ScrollViewer>
+
+          <!-- Кнопка застосування -->
+          <Border Grid.Row="2" Padding="10,8" BorderThickness="0,1,0,0"
+                  BorderBrush="#444">
+            <Button x:Name="BtnApply"
+                    Content="▶  Застосувати"
+                    HorizontalAlignment="Stretch"
+                    HorizontalContentAlignment="Center"
+                    Click="OnApply"
+                    Padding="10,8"
+                    FontWeight="SemiBold"/>
+          </Border>
+        </Grid>
+      </Border>
+
+      <!-- Права панель — результат -->
+      <Border Grid.Column="2" Margin="6" BorderThickness="1" BorderBrush="#444"
+              CornerRadius="4">
+        <Grid RowDefinitions="Auto,*">
+          <Border Grid.Row="0" Background="#252526" Padding="8,4"
+                  CornerRadius="4,4,0,0">
+            <TextBlock Text="Результат рефакторингу" FontWeight="SemiBold"
+                       Foreground="#CCCCCC"/>
+          </Border>
+          <TextBox Grid.Row="1"
+                   x:Name="OutputCode"
+                   AcceptsReturn="True"
+                   TextWrapping="NoWrap"
+                   IsReadOnly="True"
+                   FontFamily="Cascadia Code,Menlo,Courier New,Monospace"
+                   FontSize="13"
+                   Background="#1E1E1E"
+                   Foreground="#D4D4D4"
+                   BorderThickness="0"
+                   Padding="8"
+                   ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                   ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+        </Grid>
+      </Border>
+    </Grid>
+
+    <!-- ── Рядок стану ───────────────────────────────────────────────── -->
+    <Border Grid.Row="2" Background="#007ACC" Padding="8,2">
+      <TextBlock x:Name="StatusText"
+                 Text="Готово. Оберіть метод рефакторингу та натисніть «Застосувати»."
+                 Foreground="White" VerticalAlignment="Center" FontSize="12"/>
+    </Border>
+
+  </Grid>
+</Window>

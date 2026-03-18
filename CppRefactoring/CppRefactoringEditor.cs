@@ -17,10 +17,7 @@ public class CppRefactoringEditor
     }
 
     /// <summary>Повертає поточний вміст редагованого файлу.</summary>
-    public string GetCurrentCode()
-    {
-        throw new NotImplementedException();
-    }
+    public string GetCurrentCode() => _current.Content;
 
     /// <summary>
     /// Застосовує рефакторинг до поточного коду.
@@ -28,24 +25,33 @@ public class CppRefactoringEditor
     /// </summary>
     public RefactoringResult ApplyRefactoring(IRefactoring refactoring)
     {
-        throw new NotImplementedException();
+        var result = refactoring.Apply(_current);
+        if (result.Success)
+        {
+            _history.Push(_current);
+            _current = new SourceCode(result.ResultCode);
+        }
+        return result;
     }
 
     /// <summary>Скасовує останню операцію рефакторингу.</summary>
     public void Undo()
     {
-        throw new NotImplementedException();
+        if (_history.Count > 0)
+            _current = _history.Pop();
     }
 
     /// <summary>Завантажує вихідний код із файлу.</summary>
     public void LoadFromFile(string filePath)
     {
-        throw new NotImplementedException();
+        var content = File.ReadAllText(filePath);
+        _history.Clear();
+        _current = new SourceCode(content);
     }
 
     /// <summary>Зберігає поточний код у файл.</summary>
     public void SaveToFile(string filePath)
     {
-        throw new NotImplementedException();
+        File.WriteAllText(filePath, _current.Content);
     }
 }

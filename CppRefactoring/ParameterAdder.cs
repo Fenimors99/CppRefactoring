@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 namespace CppRefactoring;
 
 /// <summary>
@@ -27,7 +29,42 @@ public class ParameterAdder : IRefactoring
     /// </summary>
     public RefactoringResult Apply(SourceCode source)
     {
-        throw new NotImplementedException();
+        if (string.IsNullOrWhiteSpace(ParameterType))
+            return new RefactoringResult
+            {
+                Success      = false,
+                ErrorMessage = "Parameter type cannot be empty"
+            };
+
+        if (!FunctionExists(source, FunctionName))
+            return new RefactoringResult
+            {
+                Success      = false,
+                ErrorMessage = $"Function '{FunctionName}' not found in source code"
+            };
+
+        if (ParameterAlreadyExists(source, FunctionName, ParameterName))
+            return new RefactoringResult
+            {
+                Success      = false,
+                ErrorMessage = $"Parameter '{ParameterName}' already exists in '{FunctionName}'"
+            };
+
+        // Формуємо рядок нового параметра для сигнатури
+        string newParam = DefaultValue != null
+            ? $"{ParameterType} {ParameterName} = {DefaultValue}"
+            : $"{ParameterType} {ParameterName}";
+
+        var code = source.Content;
+
+        // 1. Оновлюємо оголошення та визначення функції
+        code = UpdateFunctionSignatures(code, newParam);
+
+        // 2. Оновлюємо місця виклику (лише якщо задано значення за замовчуванням)
+        if (DefaultValue != null)
+            code = UpdateCallSites(code, DefaultValue);
+
+        return new RefactoringResult { Success = true, ResultCode = code };
     }
 
     /// <summary>
@@ -35,7 +72,8 @@ public class ParameterAdder : IRefactoring
     /// </summary>
     public bool FunctionExists(SourceCode source, string functionName)
     {
-        throw new NotImplementedException();
+        return Regex.IsMatch(source.Content,
+            $@"\b{Regex.Escape(functionName)}\s*\(");
     }
 
     /// <summary>
@@ -44,6 +82,52 @@ public class ParameterAdder : IRefactoring
     public bool ParameterAlreadyExists(SourceCode source, string functionName,
                                        string parameterName)
     {
-        throw new NotImplementedException();
+        return Regex.IsMatch(source.Content,
+            $@"\b{Regex.Escape(functionName)}\s*\([^)]*\b{Regex.Escape(parameterName)}\b[^)]*\)");
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // Приватні допоміжні методи
+    // ──────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Оновлює всі оголошення та визначення функції (з типом повернення перед іменем).
+    /// </summary>
+    private string UpdateFunctionSignatures(string code, string newParam)
+    {
+        // Сигнатура: returnType functionName(params)
+        // returnType = одне або більше слів (з урахуванням *, &, ::)
+        var pattern = new Regex(
+            $@"(\b[\w:]+(?:\s+[\w:*&]+)*\s+){Regex.Escape(FunctionName)}\s*\(([^)]*)\)");
+
+        return pattern.Replace(code, m =>
+        {
+            var prefix   = m.Groups[1].Value;
+            var existing = m.Groups[2].Value.Trim();
+            var updated  = string.IsNullOrEmpty(existing)
+                ? newParam
+                : $"{existing}, {newParam}";
+            return $"{prefix}{FunctionName}({updated})";
+        });
+    }
+
+    /// <summary>
+    /// Оновлює місця виклику функції: додає defaultValue як аргумент.
+    /// Пропускає рядки, де FunctionName стоїть після типу повернення (сигнатура).
+    /// </summary>
+    private string UpdateCallSites(string code, string defaultValue)
+    {
+        // Виклик: functionName(args), де перед ім'ям НЕ стоїть тип_повернення+пробіл
+        var pattern = new Regex(
+            $@"(?<![\w]\s+){Regex.Escape(FunctionName)}\s*\(([^)]*)\)");
+
+        return pattern.Replace(code, m =>
+        {
+            var existing = m.Groups[1].Value.Trim();
+            var updated  = string.IsNullOrEmpty(existing)
+                ? defaultValue
+                : $"{existing}, {defaultValue}";
+            return $"{FunctionName}({updated})";
+        });
     }
 }

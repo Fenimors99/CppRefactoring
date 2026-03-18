@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 namespace CppRefactoring;
 
 /// <summary>
@@ -23,7 +25,26 @@ public class VariableRenamer : IRefactoring
     /// </summary>
     public RefactoringResult Apply(SourceCode source)
     {
-        throw new NotImplementedException();
+        if (!IsValidIdentifier(NewName))
+            return new RefactoringResult
+            {
+                Success      = false,
+                ErrorMessage = $"'{NewName}' is not a valid C++ identifier"
+            };
+
+        if (!VariableExists(source))
+            return new RefactoringResult
+            {
+                Success      = false,
+                ErrorMessage = $"Variable '{OldName}' not found in source code"
+            };
+
+        var renamed = Regex.Replace(
+            source.Content,
+            $@"\b{Regex.Escape(OldName)}\b",
+            NewName);
+
+        return new RefactoringResult { Success = true, ResultCode = renamed };
     }
 
     /// <summary>
@@ -32,7 +53,8 @@ public class VariableRenamer : IRefactoring
     /// </summary>
     public bool IsValidIdentifier(string name)
     {
-        throw new NotImplementedException();
+        if (string.IsNullOrEmpty(name)) return false;
+        return Regex.IsMatch(name, @"^[A-Za-z_][A-Za-z0-9_]*$");
     }
 
     /// <summary>
@@ -40,6 +62,6 @@ public class VariableRenamer : IRefactoring
     /// </summary>
     public bool VariableExists(SourceCode source)
     {
-        throw new NotImplementedException();
+        return Regex.IsMatch(source.Content, $@"\b{Regex.Escape(OldName)}\b");
     }
 }
