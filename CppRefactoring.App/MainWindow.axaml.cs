@@ -6,13 +6,13 @@ namespace CppRefactoring.App;
 
 public partial class MainWindow : Window
 {
-    private CppRefactoringEditor _editor = new CppRefactoringEditor(string.Empty);
+    private CppRefactoringEditor _editor        = new CppRefactoringEditor(string.Empty);
+    private string               _lastInputCode = string.Empty;
 
     public MainWindow()
     {
         InitializeComponent();
 
-        // Вибираємо перший елемент — VariableRenamer
         RefactoringSelector.SelectedIndex = 0;
         BraceStyleBox.SelectedIndex       = 0;
     }
@@ -23,9 +23,11 @@ public partial class MainWindow : Window
     {
         if (RefactoringSelector.SelectedItem is not ComboBoxItem item) return;
 
-        RenamePanel.IsVisible   = item.Tag?.ToString() == "Rename";
-        FormatPanel.IsVisible   = item.Tag?.ToString() == "Format";
-        AddParamPanel.IsVisible = item.Tag?.ToString() == "AddParam";
+        var tag = item.Tag?.ToString();
+        RenamePanel.IsVisible      = tag == "Rename";
+        FormatPanel.IsVisible      = tag == "Format";
+        AddParamPanel.IsVisible    = tag == "AddParam";
+        RemoveParamPanel.IsVisible = tag == "RemoveParam";
     }
 
     // ── Файлові операції ─────────────────────────────────────────────────
@@ -54,9 +56,11 @@ public partial class MainWindow : Window
         using var reader       = new StreamReader(stream);
         var content            = await reader.ReadToEndAsync();
 
-        InputCode.Text         = content;
-        _editor                = new CppRefactoringEditor(content);
-        OutputCode.Text        = string.Empty;
+        InputCode.Text  = content;
+        _editor         = new CppRefactoringEditor(content);
+        _lastInputCode  = content;
+        OutputCode.Text = string.Empty;
+        UpdateUndoButton();
         SetStatus($"Файл відкрито: {files[0].Name}", success: true);
     }
 
@@ -100,6 +104,7 @@ public partial class MainWindow : Window
     {
         _editor.Undo();
         OutputCode.Text = _editor.GetCurrentCode();
+        UpdateUndoButton();
         SetStatus("Останню операцію скасовано.", success: true);
     }
 
@@ -108,7 +113,13 @@ public partial class MainWindow : Window
     private void OnApply(object? sender, RoutedEventArgs e)
     {
         var inputCode = InputCode.Text ?? string.Empty;
-        _editor = new CppRefactoringEditor(inputCode);
+
+        // Recreate editor only when InputCode changed since last Apply
+        if (inputCode != _lastInputCode)
+        {
+            _editor        = new CppRefactoringEditor(inputCode);
+            _lastInputCode = inputCode;
+        }
 
         IRefactoring? refactoring = BuildRefactoring();
         if (refactoring is null) return;
@@ -125,6 +136,8 @@ public partial class MainWindow : Window
             OutputCode.Text = string.Empty;
             SetStatus($"Помилка: {result.ErrorMessage}", success: false);
         }
+
+        UpdateUndoButton();
     }
 
     // ── Фабрика об'єктів рефакторингу ────────────────────────────────────
@@ -161,12 +174,12 @@ public partial class MainWindow : Window
 
             case "AddParam":
             {
-                var funcName    = FuncNameBox.Text?.Trim()   ?? string.Empty;
-                var paramType   = ParamTypeBox.Text?.Trim()  ?? string.Empty;
-                var paramName   = ParamNameBox.Text?.Trim()  ?? string.Empty;
-                var defaultVal  = string.IsNullOrWhiteSpace(DefaultValBox.Text)
-                                      ? null
-                                      : DefaultValBox.Text.Trim();
+                var funcName   = FuncNameBox.Text?.Trim()  ?? string.Empty;
+                var paramType  = ParamTypeBox.Text?.Trim() ?? string.Empty;
+                var paramName  = ParamNameBox.Text?.Trim() ?? string.Empty;
+                var defaultVal = string.IsNullOrWhiteSpace(DefaultValBox.Text)
+                                     ? null
+                                     : DefaultValBox.Text.Trim();
 
                 if (string.IsNullOrEmpty(funcName) || string.IsNullOrEmpty(paramType)
                     || string.IsNullOrEmpty(paramName))
@@ -178,9 +191,33 @@ public partial class MainWindow : Window
                 return new ParameterAdder(funcName, paramType, paramName, defaultVal);
             }
 
+            case "RemoveParam":
+            {
+                var funcName  = RemoveFuncNameBox.Text?.Trim()  ?? string.Empty;
+                var paramName = RemoveParamNameBox.Text?.Trim() ?? string.Empty;
+
+                if (string.IsNullOrEmpty(funcName) || string.IsNullOrEmpty(paramName))
+                {
+                    SetStatus("Заповніть поля «Назва функції» та «Назва параметра».",
+                              success: false);
+                    return null;
+                }
+                return new ParameterRemover(funcName, paramName);
+            }
+
             default:
                 return null;
         }
+    }
+
+    // ── Індикатор скасування ──────────────────────────────────────────────
+
+    private void UpdateUndoButton()
+    {
+        var count = _editor.HistoryCount;
+        BtnUndo.Content = count > 0
+            ? $"↩ Скасувати ({count})"
+            : "↩ Скасувати";
     }
 
     // ── Рядок стану ──────────────────────────────────────────────────────
